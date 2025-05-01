@@ -1,61 +1,58 @@
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-from bs4 import BeautifulSoup
 import time
 
-# Setup Brave WebDriver
+# Set up Brave browser
 options = Options()
-options.headless = False  # Set to True if you want to run in headless mode
+options.headless = False  # Set to True to run in background
+options.binary_location = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
 
-# Set the Brave browser executable path (adjust path as needed)
-options.binary_location = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"  # Update with correct path
-
-# Set up the Chrome driver (Brave uses the Chrome driver)
+# Set up the ChromeDriver service
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-# Set a longer timeout to handle slow page loads
-driver.set_page_load_timeout(180)  # Timeout after 180 seconds (3 minutes)
-
-# URL to scrape
-url = "https://www.coursejoiner.com/category/free-udemy/"
-
 try:
-    # Open the URL in the browser
+    # Open CourseJoiner "Free Udemy" page
+    url = "https://www.coursejoiner.com/category/free-udemy/"
     driver.get(url)
-    print("Page opened successfully!")
+    time.sleep(3)
 
-    # Wait for the page to load completely
-    time.sleep(5)  # You can adjust this wait time if needed
+    # Find all course blocks
+    blocks = driver.find_elements(By.CLASS_NAME, "td-block-span6")
 
-    # Parse the page source with BeautifulSoup
-    soup = BeautifulSoup(driver.page_source, "html.parser")
+    # Store course titles and post links
+    course_titles = []
+    course_links = []
 
-    # Loop through each course block and extract the APPLY HERE link
-    course_blocks = soup.find_all("div", class_="td-block-span6")
-    for block in course_blocks:
-        title = block.find("h3", class_="entry-title td-module-title")
-        link = title.find("a")["href"] if title else None
-        title_text = title.get_text(strip=True) if title else "No Title"
+    for block in blocks:
+        try:
+            title = block.find_element(By.TAG_NAME, "h3").text
+            link = block.find_element(By.TAG_NAME, "a").get_attribute("href")
+            course_titles.append(title)
+            course_links.append(link)
+        except:
+            continue
 
-        print(f"Course Title: {title_text}")
-        print(f"Course Link: {link}")
+    # Loop through each course post
+    for title, course_url in zip(course_titles, course_links):
+        try:
+            driver.get(course_url)
+            time.sleep(3)
 
-        # Now, find the "APPLY HERE" button and extract the href
-        apply_button = block.find("a", class_="wp-block-button__link")
-        if apply_button and apply_button.get("href"):
-            apply_href = apply_button["href"]
-            print(f"APPLY HERE Link: {apply_href}")
-        else:
-            print("APPLY HERE Link: Not found")
+            # Find "APPLY HERE" button and extract the Udemy link
+            apply_button = driver.find_element(By.XPATH, '//a[contains(text(), "APPLY HERE")]')
+            udemy_link = apply_button.get_attribute("href")
 
-        print("-" * 50)
+            print("------------------------------------------------------------")
+            print(f"Course Title: {title}")
+            print(f"Course Page: {course_url}")
+            print(f"✅ Udemy Link: {udemy_link}")
 
-except Exception as e:
-    print(f"Error: {e}")
+        except Exception as e:
+            print("------------------------------------------------------------")
+            print(f"⚠️ Skipped due to error: {e}")
 
 finally:
-    # Ensure the driver quits after execution to avoid leaving processes open
-    driver.quit()  
+    driver.quit()
